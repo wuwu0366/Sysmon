@@ -402,13 +402,13 @@ class MainWindow(QMainWindow):
         self._total_label.setText("总事件: 0")
         self._alert_label.setText("告警: 0")
 
-    @pyqtSlot()
+    @pyqtSlot(str)
     def _on_search_changed(self, text: str):
         self._search_query = text
         self._flush_batch()
 
-    @pyqtSlot()
-    def _on_filter_changed(self):
+    @pyqtSlot(int)
+    def _on_filter_changed(self, state):
         self._exact_match = self._exact_checkbox.isChecked()
         self._alerts_only = self._alerts_checkbox.isChecked()
         self._flush_batch()
