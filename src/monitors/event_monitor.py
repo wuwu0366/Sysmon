@@ -1,11 +1,13 @@
 import time
 from typing import Optional
+from datetime import datetime
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
 try:
     import win32evtlog
     import win32con
+    import win32api
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
@@ -35,6 +37,7 @@ class EventMonitor(QThread):
         self._poll_interval = 1.0
         self._batch_buffer = []
         self._batch_interval_ms = 100
+        self._handle = None
 
     def set_matcher(self, matcher: BlacklistMatcher):
         self._matcher = matcher
@@ -49,10 +52,15 @@ class EventMonitor(QThread):
         if not self._running:
             self._running = True
             self._paused = False
+            if HAS_WIN32:
+                self._handle = win32evtlog.OpenEventLog(None, self.channel)
             self.start()
 
     def stop_monitoring(self):
         self._running = False
+        if self._handle:
+            win32evtlog.CloseEventLog(self._handle)
+            self._handle = None
         self.wait()
 
     def pause_monitoring(self):
@@ -62,50 +70,55 @@ class EventMonitor(QThread):
         self._paused = False
 
     def _query_events(self):
-        if not HAS_WIN32:
+        if not HAS_WIN32 or not self._handle:
             return []
 
         try:
-            handle = win32evtlog.OpenEventLog(None, self.channel)
-            if not handle:
-                return []
-
             flags = win32evtlog.EVENTLOG_SEQUENTIAL_READ | win32evtlog.EVENTLOG_FORWARDS_READ
             
             events = []
-            offset = 0
             while True:
-                records = win32evtlog.ReadEventLog(handle, flags, offset)
+                records = win32evtlog.ReadEventLog(self._handle, flags, 0)
                 if not records:
                     break
 
                 for record in records:
-                    offset = record.RecordNumber
                     if record.RecordNumber <= self._last_record_id:
                         continue
 
                     try:
-                        xml_str = record.Xml
-                        if not xml_str:
-                            continue
-
-                        event = self._parser.parse_event(xml_str)
-                        if event and isinstance(event, SysmonEvent):
-                            events.append((offset, event))
+                        event = self._parse_record(record)
+                        if event:
+                            events.append(event)
+                            if event.timestamp:
+                                self._last_record_id = record.RecordNumber
                     except Exception:
                         continue
 
                 if len(records) < 10:
                     break
-
-            win32evtlog.CloseEventLog(handle)
-            
-            if events:
-                self._last_record_id = max(r[0] for r in events)
-
-            return [e[1] for e in events]
+                    
+            return events
         except Exception:
             return []
+
+    def _parse_record(self, record):
+        try:
+            event_xml = getattr(record, 'Xml', None)
+            if not event_xml:
+                try:
+                    event_xml = record.StringInsertions
+                    if event_xml:
+                        event_xml = str(event_xml)
+                except Exception:
+                    pass
+                    
+            if not event_xml:
+                return None
+                
+            return self._parser.parse_event(event_xml)
+        except Exception:
+            return None
 
     def run(self):
         while self._running:
