@@ -12,7 +12,7 @@ a = Analysis(
     pathex=[project_root],
     binaries=[],
     datas=[
-        ('manifest.xml', '.'),
+        (os.path.join(project_root, 'manifest.xml'), '.'),
     ],
     hiddenimports=['PyQt5', 'pywin32', 'win32evtlog', 'win32api', 'win32con'],
     hookspath=[],

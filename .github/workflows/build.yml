@@ -24,6 +24,10 @@ jobs:
         run: |
           pyinstaller build.spec
 
+      - name: List files
+        run: |
+          ls -la dist/
+
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
