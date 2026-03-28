@@ -16,7 +16,6 @@ class SysmonParser:
         "SourcePort": "source_port",
         "DestinationIp": "dest_ip",
         "DestinationPort": "dest_port",
-        "DestinationHostname": "dest_hostname",
         "Protocol": "protocol",
         "Image": "process_name",
         "ProcessId": "process_id",
@@ -24,6 +23,8 @@ class SysmonParser:
         "QueryName": "query_name",
         "QueryResults": "query_results",
     }
+
+    HOSTNAME_FIELDS = ["DestinationHostname", "DestinationHostname", "QueryName", "query_name"]
 
     @staticmethod
     def parse_event(event_xml: str) -> Optional[SysmonEvent]:
