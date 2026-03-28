@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         self._filter_alerts_only = False
         self._exact_match = False
         self._search_query = ""
+        self._alerts_only = False
 
         self._init_ui()
         self._init_monitor()
