@@ -5,9 +5,10 @@ import os
 block_cipher = None
 
 project_root = os.path.dirname(os.path.abspath(SPEC))
+src_root = os.path.join(project_root, 'src')
 
 a = Analysis(
-    ['main.py'],
+    [os.path.join(project_root, 'main.py')],
     pathex=[project_root],
     binaries=[],
     datas=[
@@ -46,5 +47,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico',
+
 )
