@@ -251,19 +251,25 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_pause(self):
         if self._monitor:
-            if self._pause_btn.text() == "暂停":
-                self._monitor.pause_monitoring()
-                self._pause_btn.setText("继续")
-                self._status_label.setText("已暂停")
-            else:
-                self._monitor.resume_monitoring()
-                self._pause_btn.setText("暂停")
-                self._status_label.setText("监控中")
+            try:
+                if self._pause_btn.text() == "暂停":
+                    self._monitor.pause_monitoring()
+                    self._pause_btn.setText("继续")
+                    self._status_label.setText("已暂停")
+                else:
+                    self._monitor.resume_monitoring()
+                    self._pause_btn.setText("暂停")
+                    self._status_label.setText("监控中")
+            except Exception as e:
+                print(f"Pause error: {e}")
 
     @pyqtSlot()
     def _on_stop(self):
         if self._monitor:
-            self._monitor.stop_monitoring()
+            try:
+                self._monitor.stop_monitoring()
+            except Exception as e:
+                print(f"Stop error: {e}")
         self._monitoring = False
         self._timer.stop()
         self._status_label.setText("未监控")
@@ -342,9 +348,7 @@ class MainWindow(QMainWindow):
             self._time_label.setText(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
 
     def _on_malicious_event(self, event: SysmonEvent):
-        title = "恶意通讯告警"
-        message = f"{event.dest_ip} ({event.dest_hostname})"
-        self._notify_manager.send(title, message)
+        pass
 
     @pyqtSlot()
     def _on_config(self):
