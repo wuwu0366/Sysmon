@@ -18,6 +18,9 @@ class SysmonEvent:
     user: str
     is_malicious: bool = False
     matched_entry: str = ""
+    event_type: str = "network"
+    query_name: str = ""
+    query_results: str = ""
 
     def to_dict(self) -> dict:
         return {

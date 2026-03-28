@@ -58,7 +58,7 @@ class EventMonitor(QThread):
     def _query_events(self) -> List[SysmonEvent]:
         try:
             ps_script = f'''
-$events = Get-WinEvent -LogName "{self.channel}" -MaxEvents 50 -ErrorAction SilentlyContinue | Where-Object {{$_.Id -eq 3}}
+$events = Get-WinEvent -LogName "{self.channel}" -MaxEvents 50 -ErrorAction SilentlyContinue | Where-Object {{$_.Id -eq 3 -or $_.Id -eq 22}}
 foreach ($e in $events) {{
     $e.ToXml()
 }}

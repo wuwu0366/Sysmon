@@ -288,14 +288,12 @@ class MainWindow(QMainWindow):
         self._alert_label.setText(f"告警: {malicious}")
 
     def _flush_batch(self):
-        if not self._batch_buffer:
-            return
-
-        self._display_buffer.extend([
-            DisplayEvent(e, False, e.is_malicious) 
-            for e in self._batch_buffer
-        ])
-        self._batch_buffer.clear()
+        if self._batch_buffer:
+            self._display_buffer.extend([
+                DisplayEvent(e, False, e.is_malicious) 
+                for e in self._batch_buffer
+            ])
+            self._batch_buffer.clear()
 
         malicious = [d for d in self._display_buffer if d.is_malicious]
         normal = [d for d in self._display_buffer if not d.is_malicious]
@@ -315,7 +313,9 @@ class MainWindow(QMainWindow):
                 if (query in e.event.source_ip.lower() or
                     query in e.event.dest_ip.lower() or
                     query in e.event.dest_hostname.lower() or
-                    query in e.event.process_name.lower())
+                    query in e.event.process_name.lower() or
+                    query in e.event.query_name.lower() or
+                    query in e.event.protocol.lower())
             ]
 
         self._table.setRowCount(len(filtered))
@@ -325,7 +325,7 @@ class MainWindow(QMainWindow):
                 event.timestamp.strftime("%H:%M:%S") if event.timestamp else ""))
             self._table.setItem(row, 1, QTableWidgetItem(event.source_ip))
             self._table.setItem(row, 2, QTableWidgetItem(event.dest_ip))
-            self._table.setItem(row, 3, QTableWidgetItem(event.dest_hostname))
+            self._table.setItem(row, 3, QTableWidgetItem(event.dest_hostname or event.query_name))
             self._table.setItem(row, 4, QTableWidgetItem(str(event.dest_port)))
             self._table.setItem(row, 5, QTableWidgetItem(event.protocol))
             self._table.setItem(row, 6, QTableWidgetItem(event.process_name))

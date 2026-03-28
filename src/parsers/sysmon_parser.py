@@ -7,7 +7,8 @@ from src.models.event import SysmonEvent
 
 
 class SysmonParser:
-    EVENT_ID = 3
+    EVENT_ID_NETWORK = 3
+    EVENT_ID_DNS = 22
     
     FIELD_MAP = {
         "TimeCreated": "timestamp",
@@ -20,6 +21,8 @@ class SysmonParser:
         "Image": "process_name",
         "ProcessId": "process_id",
         "User": "user",
+        "QueryName": "query_name",
+        "QueryResults": "query_results",
     }
 
     @staticmethod
@@ -31,7 +34,12 @@ class SysmonParser:
             if event_id_elem is None:
                 event_id_elem = root.find(".//EventID")
             
-            if event_id_elem is not None and event_id_elem.text != "3":
+            if event_id_elem is None:
+                return None
+                
+            event_id = int(event_id_elem.text) if event_id_elem.text else 0
+            
+            if event_id not in (SysmonParser.EVENT_ID_NETWORK, SysmonParser.EVENT_ID_DNS):
                 return None
 
             time_created = None
@@ -47,12 +55,12 @@ class SysmonParser:
                 time_created = datetime.now()
 
             data = {}
-            for data_elem in root.iter():
-                for child in data_elem:
-                    for system_key in ["EventID", "TimeCreated", "Execution", "Channel", "Security"]:
-                        if child.tag.endswith(system_key):
-                            continue
-                    name = child.get("Name") or child.tag
+            for elem in root.iter():
+                for child in elem:
+                    tag_name = child.tag
+                    if tag_name.endswith("EventID") or tag_name.endswith("TimeCreated"):
+                        continue
+                    name = child.get("Name") or ""
                     value = child.text or ""
                     
                     for field_key, field_name in SysmonParser.FIELD_MAP.items():
@@ -71,12 +79,30 @@ class SysmonParser:
                     return default
 
             image_path = ""
-            for data_elem in root.iter():
-                if data_elem.tag.endswith("Data"):
-                    name = data_elem.get("Name") or ""
+            for elem in root.iter():
+                for child in elem:
+                    name = child.get("Name") or ""
                     if "ImagePath" in name or "ParentImagePath" in name:
-                        image_path = data_elem.text or ""
+                        image_path = child.text or ""
                         break
+
+            if event_id == SysmonParser.EVENT_ID_DNS:
+                return SysmonEvent(
+                    timestamp=time_created,
+                    source_ip=get_field("source_ip"),
+                    source_port=get_int_field("source_port"),
+                    dest_ip=get_field("query_results"),
+                    dest_port=53,
+                    dest_hostname=get_field("query_name"),
+                    protocol="DNS",
+                    process_name=get_field("process_name"),
+                    process_path=image_path,
+                    process_id=get_int_field("process_id"),
+                    user=get_field("user"),
+                    event_type="dns",
+                    query_name=get_field("query_name"),
+                    query_results=get_field("query_results"),
+                )
 
             return SysmonEvent(
                 timestamp=time_created,
@@ -90,6 +116,7 @@ class SysmonParser:
                 process_path=image_path,
                 process_id=get_int_field("process_id"),
                 user=get_field("user"),
+                event_type="network",
             )
         except ET.ParseError:
             return None
