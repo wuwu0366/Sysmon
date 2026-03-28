@@ -63,11 +63,16 @@ foreach ($e in $events) {{
     $e.ToXml()
 }}
 '''
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            
             result = subprocess.run(
                 ['powershell', '-ExecutionPolicy', 'Bypass', '-NoProfile', '-Command', ps_script],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                startupinfo=startupinfo
             )
             
             if result.returncode != 0:
