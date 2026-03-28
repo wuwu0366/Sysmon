@@ -1,16 +1,9 @@
 import time
-from typing import Optional
+import subprocess
+from typing import Optional, List
 from datetime import datetime
 
 from PyQt5.QtCore import QThread, pyqtSignal
-
-try:
-    import win32evtlog
-    import win32con
-    import win32api
-    HAS_WIN32 = True
-except ImportError:
-    HAS_WIN32 = False
 
 from src.parsers.sysmon_parser import SysmonParser
 from src.matchers.blacklist_matcher import BlacklistMatcher
@@ -36,8 +29,6 @@ class EventMonitor(QThread):
         self._notify_callback = None
         self._poll_interval = 1.0
         self._batch_buffer = []
-        self._batch_interval_ms = 100
-        self._handle = None
 
     def set_matcher(self, matcher: BlacklistMatcher):
         self._matcher = matcher
@@ -52,15 +43,10 @@ class EventMonitor(QThread):
         if not self._running:
             self._running = True
             self._paused = False
-            if HAS_WIN32:
-                self._handle = win32evtlog.OpenEventLog(None, self.channel)
             self.start()
 
     def stop_monitoring(self):
         self._running = False
-        if self._handle:
-            win32evtlog.CloseEventLog(self._handle)
-            self._handle = None
         self.wait()
 
     def pause_monitoring(self):
@@ -69,56 +55,41 @@ class EventMonitor(QThread):
     def resume_monitoring(self):
         self._paused = False
 
-    def _query_events(self):
-        if not HAS_WIN32 or not self._handle:
-            return []
-
+    def _query_events(self) -> List[SysmonEvent]:
         try:
-            flags = win32evtlog.EVENTLOG_SEQUENTIAL_READ | win32evtlog.EVENTLOG_FORWARDS_READ
+            ps_script = f'''
+$events = Get-WinEvent -LogName "{self.channel}" -MaxEvents 50 -ErrorAction SilentlyContinue | Where-Object {{$_.Id -eq 3}}
+foreach ($e in $events) {{
+    $e.ToXml()
+}}
+'''
+            result = subprocess.run(
+                ['powershell', '-ExecutionPolicy', 'Bypass', '-NoProfile', '-Command', ps_script],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
             
+            if result.returncode != 0:
+                return []
+
+            xml_events = result.stdout.strip().split('</Event>')
             events = []
-            while True:
-                records = win32evtlog.ReadEventLog(self._handle, flags, 0)
-                if not records:
-                    break
-
-                for record in records:
-                    if record.RecordNumber <= self._last_record_id:
-                        continue
-
-                    try:
-                        event = self._parse_record(record)
-                        if event:
-                            events.append(event)
-                            if event.timestamp:
-                                self._last_record_id = record.RecordNumber
-                    except Exception:
-                        continue
-
-                if len(records) < 10:
-                    break
+            
+            for xml_part in xml_events:
+                if not xml_part.strip():
+                    continue
+                xml_full = xml_part + '</Event>'
+                try:
+                    event = self._parser.parse_event(xml_full)
+                    if event:
+                        events.append(event)
+                except Exception:
+                    continue
                     
             return events
         except Exception:
             return []
-
-    def _parse_record(self, record):
-        try:
-            event_xml = getattr(record, 'Xml', None)
-            if not event_xml:
-                try:
-                    event_xml = record.StringInsertions
-                    if event_xml:
-                        event_xml = str(event_xml)
-                except Exception:
-                    pass
-                    
-            if not event_xml:
-                return None
-                
-            return self._parser.parse_event(event_xml)
-        except Exception:
-            return None
 
     def run(self):
         while self._running:
